@@ -1,0 +1,7 @@
+{
+  "name": "rewear",
+  "private": true,
+  "workspaces": ["frontend", "backend"],
+  "scripts": { "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"", "studio": "npm run prisma:studio -w backend", "setup": "npm install && npm run prisma:generate -w backend && npm run prisma:migrate -w backend && npm run seed -w backend" },
+  "devDependencies": { "concurrently": "^9.1.2" }
+}

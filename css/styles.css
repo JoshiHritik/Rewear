@@ -1,0 +1,11 @@
+/* Root CSS stylesheet for Rewear */
+@import '../frontend/src/styles.css';
+
+:root {
+  --color-forest: #1d4b3e;
+  --color-leaf: #477c60;
+  --color-cream: #f8f5ed;
+  --color-clay: #c9714f;
+  --font-main: 'DM Sans', sans-serif;
+  --font-serif: 'Playfair Display', serif;
+}
