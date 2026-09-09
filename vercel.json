@@ -4,7 +4,8 @@
   "outputDirectory": "dist",
   "functions": {
     "api/index.js": {
-      "includeFiles": "backend/prisma/**"
+      "memory": 1024,
+      "maxDuration": 15
     }
   },
   "rewrites": [
