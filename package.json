@@ -1,7 +1,18 @@
 {
   "name": "rewear",
   "private": true,
-  "workspaces": ["frontend", "backend"],
-  "scripts": { "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"", "studio": "npm run prisma:studio -w backend", "setup": "npm install && npm run prisma:generate -w backend && npm run prisma:migrate -w backend && npm run seed -w backend" },
-  "devDependencies": { "concurrently": "^9.1.2" }
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run prisma:generate -w backend && npm run build -w frontend",
+    "vercel-build": "npm run prisma:generate -w backend && npm run build -w frontend",
+    "studio": "npm run prisma:studio -w backend",
+    "setup": "npm install && npm run prisma:generate -w backend && npm run prisma:migrate -w backend && npm run seed -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
 }

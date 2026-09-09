@@ -3,9 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Leaf, Search, Heart, ShieldCheck, Package, Plus, Star, Menu, X, ArrowRight, Recycle, Trash2, Users, Database, AlertTriangle, Activity, CheckCircle, Coins, Edit3, ShieldAlert, RefreshCw, Truck, MapPin, PackageCheck, CheckCircle2 } from 'lucide-react';
 import './styles.css';
-const API = 'http://localhost:4000/api';
+const API = import.meta.env.VITE_API_URL || '/api';
 const call = async (path, { token, ...opts } = {}) => { const r = await fetch(API + path, { ...opts, headers: { ...(opts.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) } }); const d = r.status === 204 ? null : await r.json(); if (!r.ok) throw new Error(d.error || 'Request failed'); return d };
-const img = (item, index = 0) => { const file = item?.images?.[index] || item?.images?.[0]; if (!file) return 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=800&q=80'; if (file.startsWith('http://') || file.startsWith('https://')) return file; return 'http://localhost:4000' + (file.startsWith('/') ? file : '/' + file) };
+const img = (item, index = 0) => { const file = item?.images?.[index] || item?.images?.[0]; if (!file) return 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=800&q=80'; if (file.startsWith('http://') || file.startsWith('https://')) return file; return (import.meta.env.VITE_SERVER_URL || '') + (file.startsWith('/') ? file : '/' + file) };
 
 function DeliveryTrackerModal({ transaction, session, onClose, onRefresh }) {
   const [carrier, setCarrier] = useState(transaction.carrier || 'BlueDart Courier');

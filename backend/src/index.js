@@ -12,8 +12,8 @@ import { fileURLToPath } from 'url';
 const prisma = new PrismaClient();
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, '../uploads');
-fs.mkdirSync(uploadsDir, { recursive: true });
+const uploadsDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, '../uploads');
+try { fs.mkdirSync(uploadsDir, { recursive: true }); } catch (err) {}
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
@@ -278,4 +278,8 @@ app.patch('/api/admin/reports/:id', adminAuth, async (req, res) => {
 });
 
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ error: 'Something went wrong.' }); });
-app.listen(process.env.PORT || 4000, () => console.log('ReWear API running on port ' + (process.env.PORT || 4000)));
+if (!process.env.VERCEL) {
+  app.listen(process.env.PORT || 4000, () => console.log('ReWear API running on port ' + (process.env.PORT || 4000)));
+}
+
+export default app;
