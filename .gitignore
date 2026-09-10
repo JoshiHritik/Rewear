@@ -1,7 +1,8 @@
 node_modules
 dist
 .env
+*.env
+backend/.env
 uploads
 backend/prisma/dev.db
 .vercel
-

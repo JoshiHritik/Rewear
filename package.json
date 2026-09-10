@@ -7,10 +7,10 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"",
-    "build": "npm run prisma:generate -w backend && npm run build -w frontend && node -e \"try { require('fs').cpSync('dist', 'frontend/dist', { recursive: true }); } catch (e) {}\"",
-    "vercel-build": "npm run prisma:generate -w backend && npm run build -w frontend && node -e \"try { require('fs').cpSync('dist', 'frontend/dist', { recursive: true }); } catch (e) {}\"",
-    "studio": "npm run prisma:studio -w backend",
-    "setup": "npm install && npm run prisma:generate -w backend && npm run prisma:migrate -w backend && npm run seed -w backend"
+    "build": "npm run build -w frontend && node -e \"try { require('fs').cpSync('dist', 'frontend/dist', { recursive: true }); } catch (e) {}\"",
+    "vercel-build": "npm run build -w frontend && node -e \"try { require('fs').cpSync('dist', 'frontend/dist', { recursive: true }); } catch (e) {}\"",
+    "seed": "npm run seed -w backend",
+    "setup": "npm install && npm run seed -w backend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
