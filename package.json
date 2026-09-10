@@ -7,8 +7,8 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w rewear-api\" \"npm run dev -w rewear-web\"",
-    "build": "npm run build -w rewear-web && node -e \"try { require('fs').cpSync('frontend/dist', 'dist', { recursive: true }); } catch (e) {}\"",
-    "vercel-build": "npm run build -w rewear-web && node -e \"try { require('fs').cpSync('frontend/dist', 'dist', { recursive: true }); } catch (e) {}\"",
+    "build": "npm run build -w rewear-web && node -e \"require('fs').cpSync('dist', 'frontend/dist', { recursive: true });\"",
+    "vercel-build": "npm run build -w rewear-web && node -e \"require('fs').cpSync('dist', 'frontend/dist', { recursive: true });\"",
     "seed": "npm run seed -w rewear-api",
     "setup": "npm install && npm run seed -w rewear-api"
   },
