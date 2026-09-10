@@ -3,6 +3,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/index.js",
+    "build": "echo 'Backend ready'",
     "start": "node src/index.js",
     "seed": "node src/seed.js"
   },

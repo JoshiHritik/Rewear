@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum ItemMode {
+  TRADE
+  DONATE
+  RENT
+}
+
+enum ItemStatus {
+  AVAILABLE
+  PENDING
+  EXCHANGED
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  COMPLETED
+  DECLINED
+  DISPUTED
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+}
+
+model User {
+  id                  String        @id @default(cuid())
+  name                String
+  email               String        @unique
+  passwordHash        String
+  pointsBalance       Int           @default(50)
+  escrowBalance       Int           @default(0)
+  verified            Boolean       @default(false)
+  isAdmin             Boolean       @default(false)
+  verificationCode    String?
+  verificationExpires DateTime?
+  rating              Float         @default(0)
+  createdAt           DateTime      @default(now())
+  items               Item[]
+  sentTransactions    Transaction[] @relation("receiver")
+  receivedTransactions Transaction[] @relation("owner")
+  writtenReviews      Review[]      @relation("reviewer")
+  receivedReviews     Review[]      @relation("reviewee")
+  reportsMade         Report[]      @relation("reporter")
+  reportsAgainst      Report[]      @relation("reportedUser")
+}
+
+model Item {
+  id           String        @id @default(cuid())
+  ownerId      String
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title        String
+  description  String
+  category     String
+  size         String
+  condition    String
+  images       String
+  mode         ItemMode
+  pointsValue  Int
+  status       ItemStatus    @default(AVAILABLE)
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+  reports      Report[]
+}
+
+model Transaction {
+  id                String            @id @default(cuid())
+  itemId            String
+  item              Item              @relation(fields: [itemId], references: [id])
+  fromUserId        String
+  fromUser          User              @relation("receiver", fields: [fromUserId], references: [id])
+  toUserId          String
+  toUser            User              @relation("owner", fields: [toUserId], references: [id])
+  type              ItemMode
+  pointsSpent       Int
+  status            TransactionStatus @default(PENDING)
+  trackingNumber    String?
+  carrier           String?
+  shippedAt         DateTime?
+  deliveredAt       DateTime?
+  estimatedDelivery DateTime?
+  createdAt         DateTime          @default(now())
+  reviews           Review[]
+}
+
+model Review {
+  id            String      @id @default(cuid())
+  transactionId String      @unique
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  reviewerId    String
+  reviewer      User        @relation("reviewer", fields: [reviewerId], references: [id])
+  revieweeId    String
+  reviewee      User        @relation("reviewee", fields: [revieweeId], references: [id])
+  rating        Int
+  comment       String
+  createdAt     DateTime    @default(now())
+}
+
+model Report {
+  id             String       @id @default(cuid())
+  reportedUserId String?
+  reportedUser   User?        @relation("reportedUser", fields: [reportedUserId], references: [id])
+  reportedItemId String?
+  reportedItem   Item?        @relation(fields: [reportedItemId], references: [id])
+  reporterId     String
+  reporter       User         @relation("reporter", fields: [reporterId], references: [id])
+  reason         String
+  status         ReportStatus @default(OPEN)
+  createdAt      DateTime     @default(now())
+}
+

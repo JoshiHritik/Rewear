@@ -3,14 +3,14 @@
   "private": true,
   "workspaces": [
     "frontend",
-    "backend"
+    "frontend/backend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"",
-    "build": "npm run build -w frontend && node -e \"try { require('fs').cpSync('dist', 'frontend/dist', { recursive: true }); } catch (e) {}\"",
-    "vercel-build": "npm run build -w frontend && node -e \"try { require('fs').cpSync('dist', 'frontend/dist', { recursive: true }); } catch (e) {}\"",
-    "seed": "npm run seed -w backend",
-    "setup": "npm install && npm run seed -w backend"
+    "dev": "concurrently \"npm run dev -w rewear-api\" \"npm run dev -w rewear-web\"",
+    "build": "npm run build -w rewear-web && node -e \"try { require('fs').cpSync('frontend/dist', 'dist', { recursive: true }); } catch (e) {}\"",
+    "vercel-build": "npm run build -w rewear-web && node -e \"try { require('fs').cpSync('frontend/dist', 'dist', { recursive: true }); } catch (e) {}\"",
+    "seed": "npm run seed -w rewear-api",
+    "setup": "npm install && npm run seed -w rewear-api"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

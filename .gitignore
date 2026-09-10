@@ -3,6 +3,10 @@ dist
 .env
 *.env
 backend/.env
+frontend/backend/.env
 uploads
+frontend/backend/uploads
 backend/prisma/dev.db
+frontend/backend/prisma/dev.db
+*.db
 .vercel
