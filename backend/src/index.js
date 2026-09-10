@@ -119,25 +119,54 @@ app.post('/api/auth/signup', async (req, res) => {
   if (existing) return res.status(409).json({ error: 'An account with that email already exists.' });
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const newUser = {
-    id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    name,
-    email: email.toLowerCase(),
-    passwordHash,
-    pointsBalance: 50,
-    escrowBalance: 0,
-    verified: false,
-    isAdmin: false,
-    rating: 5.0,
-    createdAt: new Date().toISOString()
-  };
 
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase.from('User').insert(newUser).select().single();
+    
+    // 1. Register with Supabase Auth
+    let authUserId = null;
+    try {
+      const { data: authData } = await supabase.auth.signUp({
+        email: email.toLowerCase(),
+        password,
+        options: { data: { name } }
+      });
+      if (authData?.user) authUserId = authData.user.id;
+    } catch (err) {
+      console.warn('Supabase Auth signUp info:', err.message);
+    }
+
+    const userId = authUserId || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newUser = {
+      id: userId,
+      name,
+      email: email.toLowerCase(),
+      passwordHash,
+      pointsBalance: 50,
+      escrowBalance: 0,
+      verified: false,
+      isAdmin: false,
+      rating: 5.0,
+      createdAt: new Date().toISOString()
+    };
+
+    // 2. Insert into public."User" table
+    const { data, error } = await supabase.from('User').upsert(newUser, { onConflict: 'email' }).select().single();
     if (error) return res.status(500).json({ error: 'Supabase signup error: ' + error.message });
-    return res.status(201).json({ token: tokenFor(data), user: safeUser(data) });
+    return res.status(201).json({ token: tokenFor(data || newUser), user: safeUser(data || newUser) });
   } else {
+    const newUser = {
+      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name,
+      email: email.toLowerCase(),
+      passwordHash,
+      pointsBalance: 50,
+      escrowBalance: 0,
+      verified: false,
+      isAdmin: false,
+      rating: 5.0,
+      createdAt: new Date().toISOString()
+    };
     memUsers.push(newUser);
     return res.status(201).json({ token: tokenFor(newUser), user: safeUser(newUser) });
   }
@@ -394,6 +423,49 @@ app.get('/api/transactions/mine', auth, async (req, res) => {
       };
     });
     return res.json(result);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Profile & User Dashboard Endpoints
+// -----------------------------------------------------------------------------
+app.get('/api/profiles/:id', async (req, res) => {
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseClient();
+    const { data: user, error } = await supabase.from('User').select('id, name, verified, rating, createdAt').eq('id', req.params.id).single();
+    if (error || !user) return res.status(404).json({ error: 'User not found' });
+    const { data: items } = await supabase.from('Item').select('*').eq('ownerId', user.id).eq('status', 'AVAILABLE').order('createdAt', { ascending: false });
+    return res.json({ ...user, items: (items || []).map(parseImages) });
+  } else {
+    const user = memUsers.find(u => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const items = memItems.filter(i => i.ownerId === user.id && i.status === 'AVAILABLE');
+    return res.json({ id: user.id, name: user.name, verified: user.verified, rating: user.rating, createdAt: user.createdAt, items: items.map(parseImages) });
+  }
+});
+
+app.get('/api/dashboard', auth, async (req, res) => {
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseClient();
+    const [itemsRes, txRes, reportsRes] = await Promise.all([
+      supabase.from('Item').select('*').eq('ownerId', req.user.id).order('createdAt', { ascending: false }),
+      supabase.from('Transaction').select('*, item:itemId(*), fromUser:fromUserId(id, name), toUser:toUserId(id, name)').or(`fromUserId.eq.${req.user.id},toUserId.eq.${req.user.id}`).order('createdAt', { ascending: false }),
+      supabase.from('Report').select('id', { count: 'exact', head: true }).eq('reportedUserId', req.user.id).eq('status', 'OPEN')
+    ]);
+    const items = (itemsRes.data || []).map(parseImages);
+    const transactions = (txRes.data || []).map(t => ({ ...t, item: t.item ? parseImages(t.item) : null }));
+    const openReports = reportsRes.count || 0;
+    return res.json({ user: safeUser(req.user), items, transactions, openReports, manualReview: openReports >= 3 });
+  } else {
+    const items = memItems.filter(i => i.ownerId === req.user.id).map(parseImages);
+    const transactions = memTransactions.filter(t => t.fromUserId === req.user.id || t.toUserId === req.user.id).map(t => {
+      const item = memItems.find(i => i.id === t.itemId);
+      const fromUser = memUsers.find(u => u.id === t.fromUserId);
+      const toUser = memUsers.find(u => u.id === t.toUserId);
+      return { ...t, item: item ? parseImages(item) : null, fromUser: fromUser ? { id: fromUser.id, name: fromUser.name } : null, toUser: toUser ? { id: toUser.id, name: toUser.name } : null };
+    });
+    const openReports = memReports.filter(r => r.reportedUserId === req.user.id && r.status === 'OPEN').length;
+    return res.json({ user: safeUser(req.user), items, transactions, openReports, manualReview: openReports >= 3 });
   }
 });
 

@@ -145,3 +145,34 @@ INSERT INTO "Transaction" ("id", "itemId", "fromUserId", "toUserId", "type", "po
 
 INSERT INTO "Report" ("id", "reporterId", "reportedUserId", "reportedItemId", "reason", "status", "createdAt") VALUES
 ('rep_1', 'usr_alex', 'usr_sophia', 'itm_5', 'Inaccurate item description size details.', 'OPEN', NOW());
+
+-- =============================================================================
+-- 4. Supabase Auth Automatic Sync Trigger (Creates public."User" on Auth Signup)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public."User" ("id", "name", "email", "passwordHash", "pointsBalance", "escrowBalance", "verified", "isAdmin", "rating", "createdAt")
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    NEW.email,
+    'SUPABASE_AUTH',
+    50,
+    0,
+    COALESCE((NEW.email_confirmed_at IS NOT NULL), false),
+    false,
+    5.0,
+    NOW()
+  )
+  ON CONFLICT ("id") DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
