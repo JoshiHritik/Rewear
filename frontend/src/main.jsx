@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Leaf, Search, Heart, ShieldCheck, Package, Plus, Star, Menu, X, ArrowRight, Recycle, Trash2, Users, Database, AlertTriangle, Activity, CheckCircle, Coins, Edit3, ShieldAlert, RefreshCw, Truck, MapPin, PackageCheck, CheckCircle2 } from 'lucide-react';
+import { supabase, isSupabaseConfigured, signInWithGoogle } from './supabaseClient.js';
 import './styles.css';
 const API = import.meta.env.VITE_API_URL || '/api';
 const call = async (path, { token, ...opts } = {}) => {
@@ -250,14 +251,163 @@ function App() {
     }
   }, []);
 
-  return <><Nav session={session} logout={() => update(null)} /><main><Routes><Route path="/" element={<Landing />} /><Route path="/browse" element={<Browse />} /><Route path="/items/:id" element={<ItemDetail session={session} />} /><Route path="/login" element={<Auth onAuth={update} />} /><Route path="/signup" element={<Auth signup onAuth={update} />} /><Route path="/list" element={<Protected session={session}><ListItem session={session} /></Protected>} /><Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} update={update} /></Protected>} /><Route path="/profile/:id" element={<Profile />} /><Route path="/admin" element={<Protected session={session}><AdminPanel session={session} /></Protected>} /><Route path="*" element={<Navigate to="/" />} /></Routes></main><footer>ReWear <span>·</span> Wear longer. Waste less.</footer></>
+  return <><Nav session={session} logout={() => update(null)} /><main><Routes><Route path="/" element={<Landing />} /><Route path="/browse" element={<Browse />} /><Route path="/items/:id" element={<ItemDetail session={session} />} /><Route path="/login" element={<Auth onAuth={update} />} /><Route path="/signup" element={<Auth signup onAuth={update} />} /><Route path="/auth/callback" element={<AuthCallback onAuth={update} />} /><Route path="/list" element={<Protected session={session}><ListItem session={session} /></Protected>} /><Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} update={update} /></Protected>} /><Route path="/profile/:id" element={<Profile />} /><Route path="/admin" element={<Protected session={session}><AdminPanel session={session} /></Protected>} /><Route path="*" element={<Navigate to="/" />} /></Routes></main><footer>ReWear <span>·</span> Wear longer. Waste less.</footer></>
 }
 function Protected({ session, children }) { return session ? children : <Navigate to="/login" /> }
 function Nav({ session, logout }) { const [open, setOpen] = useState(false); return <header><Link to="/" className="brand"><Leaf /> ReWear</Link><button className="mobile" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button><nav className={open ? 'show' : ''}><Link to="/browse">Browse</Link>{session && <Link to="/list">List an item</Link>}{session ? <>{session?.user?.isAdmin && <Link to="/admin" className="admin-nav-link"><ShieldAlert size={14} /> Admin Panel</Link>}<Link to="/dashboard">Dashboard</Link><button onClick={logout} className="link">Log out</button></> : <><Link to="/login">Log in</Link><Link className="btn small" to="/signup">Join ReWear</Link></>}</nav></header> }
 function Landing() { return <><section className="hero"><div><p className="eyebrow">A kinder way to dress</p><h1>Give great clothes a <i>second story.</i></h1><p className="lead">Trade, donate, and rent beautiful pre-loved pieces within your community — using points, never money.</p><div className="actions"><Link className="btn" to="/browse">Explore the wardrobe <ArrowRight /></Link><Link className="text-link" to="/list">List something you love</Link></div></div><div className="hero-image"><img src="https://images.unsplash.com/photo-1485230895905-ec40ba36b9bc?auto=format&fit=crop&w=1000&q=85" /><div className="floating"><Recycle /> <b>Every swap counts</b><span>Less waste. More style.</span></div></div></section><section className="stats"><div><b>15k+</b><span>pieces recirculated</span></div><div><b>42 tons</b><span>textiles kept in use</span></div><div><b>8.4k</b><span>neighbours swapping</span></div></section><section className="how"><p className="eyebrow">How it works</p><h2>Easy on your wardrobe.<br />Lighter on the planet.</h2><div className="steps"><article><span>01</span><Package /><h3>List a piece</h3><p>Give a garment its details, condition, and a points value.</p></article><article><span>02</span><Heart /><h3>Find your next love</h3><p>Browse thoughtful finds shared by your local community.</p></article><article><span>03</span><Leaf /><h3>Keep the cycle going</h3><p>Confirm your swap and earn points for your next piece.</p></article></div></section></> }
 function Browse() { const [params, setParams] = useSearchParams(); const [items, setItems] = useState([]); const [loading, setLoading] = useState(true); const q = params.toString(); useEffect(() => { setLoading(true); call('/items?' + q).then(setItems).finally(() => setLoading(false)) }, [q]); const set = (key, value) => { value ? params.set(key, value) : params.delete(key); setParams(params) }; return <section className="page"><div className="page-title"><div><p className="eyebrow">Community wardrobe</p><h1>Find your next favourite.</h1></div><Link className="btn" to="/list"><Plus /> List an item</Link></div><div className="filters"><label className="search"><Search /><input placeholder="Search garments" defaultValue={params.get('q') || ''} onChange={e => set('q', e.target.value)} /></label><select value={params.get('category') || ''} onChange={e => set('category', e.target.value)}><option value="">All categories</option>{['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Knitwear', 'Accessories'].map(x => <option key={x}>{x}</option>)}</select><select value={params.get('size') || ''} onChange={e => set('size', e.target.value)}><option value="">All sizes</option>{['S', 'M', 'L', 'XL', 'One size'].map(x => <option key={x}>{x}</option>)}</select><select value={params.get('mode') || ''} onChange={e => set('mode', e.target.value)}><option value="">Trade, donate, or rent</option>{['TRADE', 'DONATE', 'RENT'].map(x => <option key={x} value={x}>{x[0] + x.slice(1).toLowerCase()}</option>)}</select></div>{loading ? <p>Finding pieces...</p> : <div className="grid">{items.map(item => <ItemCard key={item.id} item={item} />)}</div>}{!loading && !items.length && <div className="empty">No pieces match those filters. Try another search.</div>}</section> }
 function ItemCard({ item }) { return <Link to={`/items/${item.id}`} className="card"><div className="card-img"><img src={img(item)} /><span>{item.mode.toLowerCase()}</span></div><div className="card-copy"><p>{item.category} · {item.size}</p><h3>{item.title}</h3><b>{item.pointsValue} points</b><small>by {item.owner.name} {item.owner.verified && '✓'}</small></div></Link> }
-function Auth({ signup, onAuth }) { const nav = useNavigate(), [form, setForm] = useState({ name: '', email: '', password: '' }), [error, setError] = useState(''); const submit = async e => { e.preventDefault(); try { const s = await call('/auth/' + (signup ? 'signup' : 'login'), { method: 'POST', body: JSON.stringify(form) }); onAuth(s); nav('/browse') } catch (e) { setError(e.message) } }; return <section className="auth"><div><Leaf /><p className="eyebrow">Welcome to ReWear</p><h1>{signup ? 'Join the circular closet.' : 'Welcome back.'}</h1><p>{signup ? 'Start with 50 points and give your closet a more meaningful life.' : 'Log in to manage your wardrobe and swaps.'}</p></div><form onSubmit={submit}>{signup && <input placeholder="Your name" required onChange={e => setForm({ ...form, name: e.target.value })} />}<input type="email" placeholder="Email address" required onChange={e => setForm({ ...form, email: e.target.value })} /><input type="password" placeholder="Password" minLength="6" required onChange={e => setForm({ ...form, password: e.target.value })} />{error && <p className="error">{error}</p>}<button className="btn">{signup ? 'Create account' : 'Log in'} <ArrowRight /></button><p>{signup ? 'Already a member? ' : 'New to ReWear? '}<Link to={signup ? '/login' : '/signup'}>{signup ? 'Log in' : 'Create an account'}</Link></p></form></section> }
+
+function AuthCallback({ onAuth }) {
+  const nav = useNavigate();
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function handleAuth() {
+      try {
+        if (supabase) {
+          const { data: { session: sbSession }, error: sbError } = await supabase.auth.getSession();
+          if (sbError) throw sbError;
+
+          if (sbSession?.user) {
+            const email = sbSession.user.email;
+            const name = sbSession.user.user_metadata?.full_name || sbSession.user.user_metadata?.name || email?.split('@')[0];
+            const supabaseId = sbSession.user.id;
+
+            const s = await call('/auth/google-sync', {
+              method: 'POST',
+              body: JSON.stringify({ email, name, supabaseId })
+            });
+            onAuth(s);
+            nav('/browse');
+            return;
+          }
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const emailParam = params.get('email');
+        if (emailParam) {
+          const s = await call('/auth/google-sync', {
+            method: 'POST',
+            body: JSON.stringify({ email: emailParam, name: params.get('name') })
+          });
+          onAuth(s);
+          nav('/browse');
+          return;
+        }
+
+        setError('Google login completed, but no session details were found.');
+      } catch (err) {
+        setError(err.message || 'Error processing Google callback.');
+      }
+    }
+
+    handleAuth();
+  }, [nav, onAuth]);
+
+  return (
+    <section className="auth" style={{ justifyContent: 'center', minHeight: '60vh' }}>
+      <div style={{ textAlign: 'center', background: '#fff', padding: '36px', borderRadius: '12px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', maxWidth: '420px', margin: 'auto' }}>
+        <Leaf size={40} style={{ color: '#1d4b3e', marginBottom: '16px' }} />
+        {error ? (
+          <>
+            <h2 style={{ color: '#c9714f', fontSize: '20px', marginBottom: '8px' }}>Login Issue</h2>
+            <p style={{ color: '#555', fontSize: '14px', marginBottom: '20px' }}>{error}</p>
+            <Link to="/login" className="btn">Back to Login <ArrowRight size={16} /></Link>
+          </>
+        ) : (
+          <>
+            <h2 style={{ color: '#1d4b3e', fontSize: '20px', marginBottom: '8px' }}>Signing you into ReWear...</h2>
+            <p style={{ color: '#666', fontSize: '14px' }}>Connecting your Google account and preparing your closet.</p>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Auth({ signup, onAuth }) {
+  const nav = useNavigate();
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [error, setError] = useState('');
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const submit = async e => {
+    e.preventDefault();
+    try {
+      const s = await call('/auth/' + (signup ? 'signup' : 'login'), {
+        method: 'POST',
+        body: JSON.stringify(form)
+      });
+      onAuth(s);
+      nav('/browse');
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      if (isSupabaseConfigured()) {
+        await signInWithGoogle();
+      } else {
+        const demoEmail = 'google.user@rewear.local';
+        const demoName = 'Google Member';
+        const s = await call('/auth/google-sync', {
+          method: 'POST',
+          body: JSON.stringify({ email: demoEmail, name: demoName, supabaseId: 'usr_g_demo' })
+        });
+        onAuth(s);
+        nav('/browse');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to initialize Google Sign In');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  return (
+    <section className="auth">
+      <div>
+        <Leaf />
+        <p className="eyebrow">Welcome to ReWear</p>
+        <h1>{signup ? 'Join the circular closet.' : 'Welcome back.'}</h1>
+        <p>{signup ? 'Start with 50 points and give your closet a more meaningful life.' : 'Log in to manage your wardrobe and swaps.'}</p>
+      </div>
+      <form onSubmit={submit}>
+        <button
+          type="button"
+          className="btn-google"
+          onClick={handleGoogleLogin}
+          disabled={googleLoading}
+        >
+          <svg className="google-icon" viewBox="0 0 24 24" width="18" height="18">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          {googleLoading ? 'Connecting to Google...' : (signup ? 'Sign up with Google' : 'Sign in with Google')}
+        </button>
+
+        <div className="auth-divider">
+          <span>or continue with email</span>
+        </div>
+
+        {signup && <input placeholder="Your name" required onChange={e => setForm({ ...form, name: e.target.value })} />}
+        <input type="email" placeholder="Email address" required onChange={e => setForm({ ...form, email: e.target.value })} />
+        <input type="password" placeholder="Password" minLength="6" required onChange={e => setForm({ ...form, password: e.target.value })} />
+        {error && <p className="error">{error}</p>}
+        <button className="btn">{signup ? 'Create account' : 'Log in'} <ArrowRight /></button>
+        <p>{signup ? 'Already a member? ' : 'New to ReWear? '}<Link to={signup ? '/login' : '/signup'}>{signup ? 'Log in' : 'Create an account'}</Link></p>
+      </form>
+    </section>
+  );
+}
 function ItemDetail({ session }) { const { id } = useParams(), nav = useNavigate(), [item, setItem] = useState(), [selectedImg, setSelectedImg] = useState(0), [note, setNote] = useState(''), [unlisting, setUnlisting] = useState(false); useEffect(() => { call('/items/' + id).then(setItem) }, [id]); const request = async () => { try { await call('/transactions/request/' + id, { method: 'POST', token: session?.token }); setNote('Request sent! The owner will be notified.') } catch (e) { setNote(e.message) } }; const unlistItem = async () => { if (!window.confirm('Are you sure you want to unlist this item?')) return; setUnlisting(true); try { await call('/items/' + id, { method: 'DELETE', token: session?.token }); nav('/dashboard') } catch (e) { setNote(e.message); setUnlisting(false) } }; if (!item) return <section className="page">Loading piece...</section>; return <section className="detail page"><div><img src={img(item, selectedImg)} style={{ width: '100%', height: '550px', objectFit: 'cover', borderRadius: '4px' }} />{item.images?.length > 1 && <div className="gallery-thumbs">{item.images.map((_, idx) => <img key={idx} src={img(item, idx)} className={selectedImg === idx ? 'active' : ''} onClick={() => setSelectedImg(idx)} />)}</div>}</div><div><p className="eyebrow">{item.mode.toLowerCase()} · {item.category}</p><h1>{item.title}</h1><p className="price">{item.pointsValue} points</p><p>{item.description}</p><div className="chips"><span>Size {item.size}</span><span>{item.condition}</span></div><Link to={`/profile/${item.owner.id}`} className="owner"><div>{item.owner.name[0]}</div><p>Listed by <b>{item.owner.name}</b><small>{item.owner.verified ? '✓ Verified member' : 'Community member'} · ★ {item.owner.rating.toFixed(1)}</small></p></Link>{session?.user.id === item.owner.id ? (<button onClick={unlistItem} disabled={unlisting} className="btn danger"><Trash2 size={18} /> {unlisting ? 'Unlisting...' : 'Unlist item'}</button>) : (session ? <button onClick={request} className="btn">Request this item <ArrowRight /></button> : <Link className="btn" to="/login">Log in to request <ArrowRight /></Link>)}{note && <p className="notice">{note}</p>}</div></section> }
 function ListItem({ session }) { const nav = useNavigate(), [form, setForm] = useState({ title: '', description: '', category: 'Tops', size: 'M', condition: 'Good', mode: 'TRADE', pointsValue: 20 }), [files, setFiles] = useState([]), [error, setError] = useState(''); const submit = async e => { e.preventDefault(); const data = new FormData(); Object.entries(form).forEach(([k, v]) => data.append(k, v));[...files].forEach(f => data.append('images', f)); try { const item = await call('/items', { method: 'POST', token: session.token, body: data }); nav('/items/' + item.id) } catch (e) { setError(e.message) } }; return <section className="form-page"><p className="eyebrow">Share a piece</p><h1>Ready for its next story.</h1><form onSubmit={submit} className="listing-form"><label>Title<input required onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Linen summer dress" /></label><label>Description<textarea required rows="4" onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tell the community about the piece, fit, and anything to know." /></label><div className="two"><label>Category<select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Knitwear', 'Accessories'].map(x => <option key={x}>{x}</option>)}</select></label><label>Size<select value={form.size} onChange={e => setForm({ ...form, size: e.target.value })}>{['XS', 'S', 'M', 'L', 'XL', 'One size'].map(x => <option key={x}>{x}</option>)}</select></label></div><div className="two"><label>Condition<select value={form.condition} onChange={e => setForm({ ...form, condition: e.target.value })}>{['Like new', 'Excellent', 'Good', 'Well loved'].map(x => <option key={x}>{x}</option>)}</select></label><label>How should it circulate?<select value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value })}>{['TRADE', 'DONATE', 'RENT'].map(x => <option key={x}>{x}</option>)}</select></label></div><label>Points value<input type="number" min="0" value={form.pointsValue} onChange={e => setForm({ ...form, pointsValue: e.target.value })} /></label><label className="upload">Add photos (up to 5)<input type="file" accept="image/*" multiple onChange={e => setFiles(e.target.files)} /><small>{files.length ? `${files.length} photo(s) selected` : 'JPG, PNG, or WebP · 5 MB each'}</small></label>{error && <p className="error">{error}</p>}<button className="btn">Publish listing <ArrowRight /></button></form></section> }
 function VerifyEmailModal({ session, onClose, onVerified }) {

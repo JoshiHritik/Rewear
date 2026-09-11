@@ -204,6 +204,67 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+app.post('/api/auth/google-sync', async (req, res) => {
+  try {
+    const { email, name, supabaseId } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required for Google authentication.' });
+    }
+
+    const normalizedEmail = email.toLowerCase();
+    let existingUser = await findUserByEmail(normalizedEmail);
+
+    if (!existingUser && supabaseId) {
+      existingUser = await findUserById(supabaseId);
+    }
+
+    const userName = name || normalizedEmail.split('@')[0];
+
+    if (existingUser) {
+      if (!existingUser.verified) {
+        if (isSupabaseConfigured()) {
+          const supabase = getSupabaseClient();
+          const { data } = await supabase.from('User').update({ verified: true }).eq('id', existingUser.id).select().single();
+          if (data) existingUser = data;
+        } else {
+          existingUser.verified = true;
+        }
+      }
+      return res.json({ token: tokenFor(existingUser), user: safeUser(existingUser) });
+    }
+
+    const userId = supabaseId || `usr_g_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newUser = {
+      id: userId,
+      name: userName,
+      email: normalizedEmail,
+      passwordHash: '',
+      pointsBalance: 50,
+      escrowBalance: 0,
+      verified: true,
+      isAdmin: false,
+      rating: 5.0,
+      createdAt: new Date().toISOString()
+    };
+
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.from('User').upsert(newUser, { onConflict: 'email' }).select().single();
+      if (error) {
+        console.warn('Supabase Google sync upsert warning:', error.message);
+      }
+      const userToReturn = data || newUser;
+      return res.status(201).json({ token: tokenFor(userToReturn), user: safeUser(userToReturn) });
+    } else {
+      memUsers.push(newUser);
+      return res.status(201).json({ token: tokenFor(newUser), user: safeUser(newUser) });
+    }
+  } catch (err) {
+    console.error('Google sync error:', err);
+    res.status(500).json({ error: 'Server error during Google auth sync: ' + (err.message || 'Unknown error') });
+  }
+});
+
 app.get('/api/auth/me', auth, (req, res) => res.json(safeUser(req.user)));
 
 app.post('/api/auth/verify', auth, async (req, res) => {
