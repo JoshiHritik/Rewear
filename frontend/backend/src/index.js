@@ -50,19 +50,30 @@ const memReports = [];
 
 // Helper functions for user lookup
 async function findUserById(id) {
-  if (isSupabaseConfigured()) {
-    const supabase = getSupabaseClient();
-    const { data } = await supabase.from('User').select('*').eq('id', id).single();
-    return data;
+  try {
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.from('User').select('*').eq('id', id).maybeSingle();
+      if (error) console.warn('Supabase findUserById warning:', error.message);
+      if (data) return data;
+    }
+  } catch (err) {
+    console.error('findUserById error:', err.message);
   }
   return memUsers.find(u => u.id === id) || null;
 }
 
 async function findUserByEmail(email) {
-  if (isSupabaseConfigured()) {
-    const supabase = getSupabaseClient();
-    const { data } = await supabase.from('User').select('*').eq('email', email.toLowerCase()).single();
-    return data;
+  if (!email) return null;
+  try {
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.from('User').select('*').eq('email', email.toLowerCase()).maybeSingle();
+      if (error) console.warn('Supabase findUserByEmail warning:', error.message);
+      if (data) return data;
+    }
+  } catch (err) {
+    console.error('findUserByEmail error:', err.message);
   }
   return memUsers.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
 }
@@ -173,12 +184,24 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
-  const user = await findUserByEmail(email || '');
-  if (!user || !(await bcrypt.compare(password || '', user.passwordHash))) {
-    return res.status(401).json({ error: 'Invalid email or password.' });
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' });
+    }
+    const user = await findUserByEmail(email);
+    if (!user || !user.passwordHash) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+    res.json({ token: tokenFor(user), user: safeUser(user) });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error during login: ' + (err.message || 'Unknown error') });
   }
-  res.json({ token: tokenFor(user), user: safeUser(user) });
 });
 
 app.get('/api/auth/me', auth, (req, res) => res.json(safeUser(req.user)));
